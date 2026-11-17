@@ -3,3 +3,6 @@ dist/
 .qa/
 *.log
 
+__pycache__/
+*.pyc
+test-*.log
