@@ -9,6 +9,17 @@ permissions:
   contents: read
 
 jobs:
+  sandbox:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Ubuntu official bubblewrap
+        run: sudo apt-get update -qq && sudo apt-get install -y bubblewrap
+      - name: Prepare exact verified build tools
+        run: python3 ops/bootstrap_tools.py "$RUNNER_TEMP/amber-tools"
+      - name: Verify real isolated install, build, tests and filesystem boundary
+        run: python3 ops/tests/validate_sandbox.py --tools "$RUNNER_TEMP/amber-tools" --scratch "$RUNNER_TEMP/amber-sandbox-validation"
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
