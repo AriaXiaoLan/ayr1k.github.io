@@ -5,31 +5,31 @@ import './downloads.css';
 export function DownloadPage({en,product}) {
  const t=(zh,english)=>en?english:zh;
  const repo=`https://github.com/ayr1k/${product==='AMBER'?'amber-launcher':'AmberE'}`;
- const release=repo+'/releases/tag/v1.7.3';
- const file=name=>repo+'/releases/download/v1.7.3/'+name;
+ const release=repo+'/releases/tag/v1.7.4';
+ const file=name=>repo+'/releases/download/v1.7.4/'+name;
  const platforms=[
-  {id:'windows',icon:WindowsLogo,title:'Windows',tag:t('已验证启动与界面','Startup & UI verified'),detail:t('x64 · 安装程序 EXE','x64 · EXE installer'),body:t('安装时可选择中英文。同产品覆盖安装保留游戏数据。','Choose Chinese or English during installation. Same-product upgrades retain game data.'),links:[['Windows x64',`${product}-1.7.3-Setup-x64.exe`]]},
-  {id:'mac',icon:AppleLogo,title:'macOS',tag:t('待实机验证','Device testing pending'),detail:t('Intel / Apple Silicon · 应用 ZIP','Intel / Apple Silicon · App ZIP'),body:t('按芯片选择下载，解压后移入“应用程序”。未签名、未公证，Gatekeeper 可能阻止打开；尚未完成 Mac 实机和游戏验证。','Choose your chip, unzip, then move the app to Applications. Unsigned and not notarized; Gatekeeper may block it. Mac launch and gameplay have not been verified.'),links:[['Intel x64',`${product}-1.7.3-mac-x64.zip`],['Apple Silicon',`${product}-1.7.3-mac-arm64.zip`]]},
-  {id:'linux',icon:LinuxLogo,title:'Linux',tag:t('部分验证','Partially verified'),detail:'x64 · Debian / Ubuntu · DEB',body:t('通过软件包管理器安装依赖，并配置可用的桌面密钥库。Ubuntu/WSL 已验证运行环境、地图和 Java 安装；完整桌面、账号加密与游戏仍需实测。','Install dependencies with your package manager and configure a desktop keyring. Runtime, map and Java installation were checked in Ubuntu/WSL; full desktop, credential encryption and gameplay still need testing.'),links:[['Linux x64',`${product}-1.7.3-linux-x64.deb`]]},
-  {id:'freebsd',icon:TerminalWindow,title:'FreeBSD',tag:t('实验包 · 服务端与工具','Experimental · Servers & tools'),detail:'amd64 · TAR.GZ',body:t('暂不支持 Minecraft 游戏客户端，未做 FreeBSD 实机验证。需系统提供 Electron、OpenJDK、密钥库及 C 编译器，并按包内说明构建地图程序。','Minecraft client launch is unavailable; no FreeBSD device testing has been done. Requires system Electron, OpenJDK, a keyring and a C compiler. Build the map helper using the included instructions.'),links:[[t('FreeBSD 实验包','FreeBSD experimental'),`${product}-1.7.3-freebsd-x64-experimental.tar.gz`]]}
+  {id:'windows',icon:WindowsLogo,title:'Windows',tag:t('已验证启动与界面','Startup & UI verified'),detail:t('x64 · 安装程序 EXE','x64 · EXE installer'),body:t('安装时可选择中英文。同产品覆盖安装保留游戏数据。','Choose Chinese or English during installation. Same-product upgrades retain game data.'),links:[['Windows x64',`${product}-1.7.4-Setup-x64.exe`]]},
+  {id:'mac',icon:AppleLogo,title:'macOS',tag:t('待实机验证','Device testing pending'),detail:t('Intel / Apple Silicon · 应用 ZIP','Intel / Apple Silicon · App ZIP'),body:t('按芯片选择下载，解压后移入“应用程序”。未签名、未公证，Gatekeeper 可能阻止打开；尚未完成 Mac 实机和游戏验证。','Choose your chip, unzip, then move the app to Applications. Unsigned and not notarized; Gatekeeper may block it. Mac launch and gameplay have not been verified.'),links:[['Intel x64',`${product}-1.7.4-mac-x64.zip`],['Apple Silicon',`${product}-1.7.4-mac-arm64.zip`]]},
+  {id:'linux',icon:LinuxLogo,title:'Linux',tag:t('部分验证','Partially verified'),detail:'x64 · Debian / Ubuntu · DEB',body:t('通过软件包管理器安装依赖，并配置可用的桌面密钥库。Ubuntu/WSL 已验证运行环境、地图和 Java 安装；完整桌面、账号加密与游戏仍需实测。','Install dependencies with your package manager and configure a desktop keyring. Runtime, map and Java installation were checked in Ubuntu/WSL; full desktop, credential encryption and gameplay still need testing.'),links:[['Linux x64',`${product}-1.7.4-linux-x64.deb`]]},
+  {id:'freebsd',icon:TerminalWindow,title:'FreeBSD',tag:t('实验包 · 服务端与工具','Experimental · Servers & tools'),detail:'amd64 · TAR.GZ',body:t('暂不支持 Minecraft 游戏客户端，未做 FreeBSD 实机验证。需系统提供 Electron、OpenJDK、密钥库及 C 编译器，并按包内说明构建地图程序。','Minecraft client launch is unavailable; no FreeBSD device testing has been done. Requires system Electron, OpenJDK, a keyring and a C compiler. Build the map helper using the included instructions.'),links:[[t('FreeBSD 实验包','FreeBSD experimental'),`${product}-1.7.4-freebsd-x64-experimental.tar.gz`]]}
  ];
  return <section className="page download-page">
-  <span className="eyebrow">DOWNLOAD / 1.7.3</span>
+  <span className="eyebrow">DOWNLOAD / 1.7.4</span>
   <h1>{t('选择你的版本，开始下一次冒险。','Choose your edition. Start your next adventure.')}</h1>
-  <p className="lede">{t("1.7.3：支持上下键调取近期服务端指令、手动刷新本机与局域网地址，完善发送和复制反馈；优化控制台布局及账号列表，详情页仍保留编辑功能。","1.7.3: Recall recent server commands with Up/Down, refresh local and LAN addresses, and see clearer send/copy feedback. Improve console layouts and simplify account rows while keeping editing in account details.")}</p>
+  <p className="lede">{t("1.7.4：迁移时可直接选择已有实例，也可从已管理的本机服务器创建独立客户端；安装前预览兼容内容与依赖，保留来源保护和取消处理。","1.7.4: Select an existing instance directly for migration, or create an independent client from a managed local server. Preview compatible content and dependencies before installation, with source protection and cancellation handling.")}</p>
   <nav className="edition-switch" aria-label={t('产品版本','Product edition')}>
    {['AMBER','AmberE'].map(name=><a key={name} href={'#/download'+(name==='AmberE'?'?product=ambere':'')} aria-current={product===name?'page':undefined}>{name}</a>)}
   </nav>
-  <div className="download-main"><div><h2>{product} <span>1.7.3</span></h2><p>{product==='AMBER'?t('微软登录、正版资格验证与已验证离线身份。','Microsoft sign-in, ownership verification and verified offline identities.'):t('独立的离线与第三方账号版本，不提供微软登录。','Independent offline and third-party edition, without Microsoft sign-in.')}</p></div><span className="release-label">{t('免费开源 · 未签名','Free & open source · Unsigned')}</span></div>
+  <div className="download-main"><div><h2>{product} <span>1.7.4</span></h2><p>{product==='AMBER'?t('微软登录、正版资格验证与已验证离线身份。','Microsoft sign-in, ownership verification and verified offline identities.'):t('独立的离线与第三方账号版本，不提供微软登录。','Independent offline and third-party edition, without Microsoft sign-in.')}</p></div><span className="release-label">{t('免费开源 · 未签名','Free & open source · Unsigned')}</span></div>
   <div className="platform-downloads">
    {platforms.map(p=><section className="platform-download" key={p.id} data-platform={p.id} aria-labelledby={'platform-'+p.id}>
-    <div className="platform-heading"><p.icon size={30}/><div><h3 id={'platform-'+p.id}>{p.title} <small>{'1.7.3'}</small></h3><span>{p.detail}</span></div></div>
+    <div className="platform-heading"><p.icon size={30}/><div><h3 id={'platform-'+p.id}>{p.title} <small>{'1.7.4'}</small></h3><span>{p.detail}</span></div></div>
     <div className="platform-description"><span className="platform-status">{p.tag}</span><p>{p.body}</p></div>
     <div className="platform-actions">{p.links.map(([label,name])=><a className="button green" key={name} href={file(name)}><DownloadSimple size={19}/>{label}</a>)}</div>
    </section>)}
   </div>
   <div className="download-links">
-   {[[t('发布说明','Release notes'),release],[t('完整源码','Full source'),file(`${product}-1.7.3-source.zip`)],['SHA-256',file('SHA256SUMS.txt')],[t('平台安装说明','Platform setup'),repo+'/blob/v1.7.3/prototype/PLATFORMS-1.3.5.md']].map(([label,url])=><a key={label} href={url} target="_blank" rel="noreferrer">{label}<ArrowUpRight size={18}/></a>)}
+   {[[t('发布说明','Release notes'),release],[t('完整源码','Full source'),file(`${product}-1.7.4-source.zip`)],['SHA-256',file('SHA256SUMS.txt')],[t('平台安装说明','Platform setup'),repo+'/blob/v1.7.4/prototype/PLATFORMS-1.3.5.md']].map(([label,url])=><a key={label} href={url} target="_blank" rel="noreferrer">{label}<ArrowUpRight size={18}/></a>)}
   </div>
   <div className="install-notes"><h3>{t('安装与升级','Installing and upgrading')}</h3><ul>
    <li>{t('升级前保存并停止服务端、关闭游戏与启动器，并备份重要存档。','Save and stop servers, close games and the launcher, and back up important worlds before upgrading.')}</li>
