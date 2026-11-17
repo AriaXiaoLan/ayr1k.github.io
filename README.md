@@ -154,3 +154,6 @@ Paired all-platform downloads, source/provenance/checksums and bilingual console
 
 ## 1.7.4 publication
 Paired all-platform downloads, source/provenance/checksums and bilingual direct-migration/local-server client notes. Deploy after both stable releases are public. Preserve all seven themes, artist attribution and permanent community acknowledgements.
+
+## 1.7.5 publication
+Paired all-platform downloads, source/provenance/checksums and bilingual update-source notes. Preserve the existing mirror interface, sync operations, seven themes and artist attribution. Deploy after both stable releases are public.
