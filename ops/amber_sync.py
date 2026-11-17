@@ -378,6 +378,8 @@ class Engine:
         self.state_path = confined(self.root, "private/state.json")
         self.api = github or GitHub(self.private / "cache")
         self.state = self.read_state()
+        from site_builder import recover_website
+        recover_website(self)
 
     def read_state(self):
         if not self.state_path.exists():
@@ -468,19 +470,35 @@ class Engine:
     def sync_product(self, product):
         releases = select_releases(self.api.releases(PRODUCTS[product]))
         require(releases, "NO_STABLE_RELEASES")
-        # Revalidate every retained managed version, even if no longer in the top five.
-        candidates = set(list(releases)[:5]) | {
+        # Select the newest FIVE SUCCESSES, not merely five upstream tags.
+        # Invalid/missing-digest releases do not consume a transfer or retention
+        # slot. Retained older versions are still inspected for upstream changes.
+        managed = {
             r["version"] for r in self.state["records"].values()
             if r["product"] == product and r["status"] in ("ready", "pending", "held")}
-        errors, transferred = [], 0
-        for version in sorted(candidates, key=key, reverse=True):
+        errors, transferred, successes = [], 0, 0
+        unresolved = self.state.setdefault('release_failures',{})
+        budget = self.config.get('backfill_per_run',1)
+        require(type(budget) is int and 1 <= budget <= 5, 'INVALID_BACKFILL_BUDGET')
+        for version in sorted(set(releases)|managed, key=key, reverse=True):
             try:
                 require(version in releases, "MANAGED_RELEASE_REMOVED_OR_NOT_STABLE")
                 release = releases[version]
                 record_id = product + "/" + version
-                new_version = record_id not in self.state["records"]
-                if new_version:
-                    if transferred >= self.config.get("backfill_per_run", 1):
+                prior = self.state['records'].get(record_id)
+                if prior and prior['status'] in ('quarantined','quarantining','restoring'):
+                    continue  # Operator quarantine is not automatically undone.
+                deferred = False
+                if version not in managed:
+                    if successes >= 5:
+                        continue
+                    if transferred >= budget:
+                        if record_id not in unresolved:
+                            continue
+                        deferred = True  # Do not hide a previously reported anomaly.
+                elif prior['status'] == 'pending' and transferred >= budget:
+                    destination = confined(self.root,f'public/mirror/{product.lower()}/{version}')
+                    if not destination.exists():
                         continue
                 # Enumerate the asset endpoint; do not assume an embedded array
                 # in a collection response is complete.
@@ -488,9 +506,21 @@ class Engine:
                 require(full.get("id") == release["id"] and full.get("tag_name") == "v" + version,
                         "RELEASE_CHANGED_DURING_INSPECTION")
                 release = full
+                if deferred:
+                    record = release_record(product,release)
+                    observed = self.state['observations'].get(record_id)
+                    require(observed is None or observed==record['identity'],'UPSTREAM_ASSET_CHANGED')
+                    unresolved.pop(record_id,None)
+                    self.save()
+                    log('release_deferred',product=product,version=version,reason='success_budget')
+                    continue
                 result = self.sync_release(product, release)
-                if new_version and result == 'published':
+                unresolved.pop(record_id,None)
+                self.save()
+                if result == 'published':
                     transferred += 1
+                if self.state['records'][record_id]['status'] == 'ready':
+                    successes += 1
                 log("release", product=product, version=version, result=result)
             except (SyncError, OSError, ValueError, KeyError, TypeError) as exc:
                 code = str(exc) if isinstance(exc, SyncError) else type(exc).__name__
@@ -499,7 +529,11 @@ class Engine:
                     retained["status"] = "held"
                     self.save()
                 errors.append({"version": version, "code": code})
+                unresolved[product+'/'+version]={'code':code,'last_checked':int(time.time())}
+                self.save()
                 log("release_failed", product=product, version=version, code=code)
+                if code in ('GITHUB_RATE_LIMIT_OR_FORBIDDEN','GITHUB_UNAVAILABLE'):
+                    break
         require(not errors, "PRODUCT_SYNC_FAILED")
 
     def pins(self):
@@ -637,10 +671,8 @@ def main():
                 from site_builder import rollback
                 rollback(engine)
             elif args.command == "resume-site":
-                require(engine.state.get("website"), "NO_WEBSITE_STATE")
-                engine.state["website"]["paused"] = False
-                engine.save()
-                log("website_resumed")
+                from site_builder import resume_website
+                resume_website(engine)
             elif args.command == "status":
                 log("status", status=json.loads((engine.private / "status.json").read_text()))
         return 0

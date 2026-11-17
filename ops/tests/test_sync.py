@@ -437,8 +437,12 @@ class WorkerProtocolTests(unittest.TestCase):
         (self.job / 'site').mkdir(parents=True)
         (self.job / 'site/index.html').write_text('<p>fixture</p>')
         self.pins = {p:['1.7.4'] for p in sync.PRODUCTS}
-        self.result = {'schema':1,'id':self.job_id,'commit':self.commit,'ok':True,
-                       'pins':self.pins,'files':worker.static_hashes(self.job / 'site')}
+        self.result = {'schema':2,'id':self.job_id,'commit':self.commit,'ok':True,
+                       'pins':self.pins,'files':worker.static_hashes(self.job / 'site'),
+                       'network':{'install':{'phase':'install','namespace':'net:[1]',
+                           'direct_network_blocked':True,'registry_proxy':'registry.npmjs.org:443'},
+                           'build':{'phase':'offline','namespace':'net:[2]','direct_network_blocked':True,
+                                    'ip_socket_families_blocked':True,'proxy_mounted':False}}}
         self.write_result()
 
     def write_result(self):

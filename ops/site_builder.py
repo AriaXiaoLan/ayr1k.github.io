@@ -15,7 +15,8 @@ import urllib.parse
 import uuid
 
 from amber_sync import (PRODUCTS, WEBSITE, SyncError, atomic_json, confined,
-                        digest, key, log, require, sync_dir, sync_tree)
+                        digest, encoded, key, log, require, sync_dir, sync_tree)
+from storage import PublicationSpace
 
 NODE = "24.22.1"
 PNPM = "11.25.0"
@@ -213,13 +214,85 @@ def switch(engine, current, previous):
 
 
 def rollback(engine):
+    recover_website(engine)
+    website = engine.state.get('website') or {}
+    if website.get('paused') and website.get('rollback', {}).get('phase') == 'complete':
+        log('website_rollback_already_complete', commit=website['commit'])
+        return
     current, previous = active_pair(engine)
     require(current and previous and current != previous, "NO_ROLLBACK_AVAILABLE")
-    switch(engine, previous, current)
-    # Pin prevents a scheduled run immediately undoing an operator rollback.
-    engine.state["website"] = {"commit": previous, "paused": True}
+    # Write-ahead decision: pause is durable BEFORE any public pointer changes.
+    # Recovery accepts either side of the atomic rename and finishes idempotently.
+    transaction = {'id':uuid.uuid4().hex, 'phase':'pending',
+                   'from':[current,previous], 'to':[previous,current]}
+    engine.state['website'] = {'commit':current,'paused':True,'rollback':transaction}
     engine.save()
-    log("website_rollback", commit=previous, paused=True)
+    transaction_checkpoint('rollback_intent_saved')
+    recover_website(engine)
+
+
+def transaction_checkpoint(name):
+    """No-op in production; process-exit fault injection is patched in tests."""
+
+
+def recover_website(engine):
+    website = engine.state.get('website') or {}
+    transaction = website.get('rollback')
+    if not transaction or transaction.get('phase') == 'complete':
+        return
+    require(transaction.get('phase') == 'pending' and website.get('paused') is True,
+            'INVALID_ROLLBACK_TRANSACTION')
+    before, target = transaction.get('from'), transaction.get('to')
+    require(isinstance(before,list) and len(before)==2 and
+            isinstance(target,list) and len(target)==2 and target==list(reversed(before)) and
+            all(isinstance(c,str) and COMMIT.fullmatch(c) for c in before) and before[0]!=before[1],
+            'INVALID_ROLLBACK_TRANSACTION')
+    pair = active_pair(engine)
+    require(pair in (tuple(before),tuple(target)), 'ROLLBACK_POINTER_CONFLICT')
+    if pair == tuple(before):
+        switch(engine,*target)
+    transaction_checkpoint('rollback_pointer_switched')
+    engine.state['website'] = {'commit':target[0],'paused':True,
+        'rollback':{**transaction,'phase':'complete'}}
+    engine.save()
+    transaction_checkpoint('rollback_complete_saved')
+    log('website_rollback',commit=target[0],paused=True,transaction=transaction['id'])
+
+
+def resume_website(engine):
+    recover_website(engine)
+    require(engine.state.get('website'), 'NO_WEBSITE_STATE')
+    current, _ = active_pair(engine)
+    require(current, 'NO_ACTIVE_WEBSITE')
+    # Clear the completed transaction and unpause in ONE durable state write.
+    engine.state['website'] = {'commit':current,'paused':False}
+    engine.save()
+    log('website_resumed',commit=current)
+
+
+def publication_plan(engine, static, current, metadata):
+    """Exact union: new files plus distinct historical assets, never duplicates."""
+    files = {p.relative_to(static).as_posix():(p,p.stat().st_size)
+             for p in static.rglob('*') if p.is_file()}
+    if current:
+        old_assets = engine.public / 'sites' / current / 'assets'
+        if old_assets.exists():
+            require(not old_assets.is_symlink(), 'OLD_ASSET_SYMLINK')
+            for old in old_assets.rglob('*'):
+                require(not old.is_symlink() and (old.is_dir() or old.is_file()), 'OLD_ASSET_SYMLINK')
+                if old.is_file():
+                    name = 'assets/' + old.relative_to(old_assets).as_posix()
+                    if name in files:
+                        require(digest(files[name][0])==digest(old), 'STATIC_ASSET_NAME_COLLISION')
+                    else:
+                        files[name] = (old,old.stat().st_size)
+    directories = {'.'}
+    for name in files:
+        directories.update(p.as_posix() for p in Path(name).parents)
+    guard = PublicationSpace(engine)
+    budget = sum(guard.allocated(size) for _,size in files.values())
+    budget += guard.allocated(len(metadata)) + len(directories)*guard.block + 65536
+    return files,directories,guard,budget
 
 
 def publish_site(engine, source, static, commit):
@@ -229,29 +302,24 @@ def publish_site(engine, source, static, commit):
     current, _ = active_pair(engine)
     destination = confined(engine.root, "public/sites/" + commit)
     require(not destination.exists(), "DEPLOYMENT_ALREADY_EXISTS")
-    engine.space(sum(p.stat().st_size for p in static.rglob("*") if p.is_file()))
+    metadata = {'schema':1,'commit':commit,'pins':source_pins(source)}
+    metadata_bytes = encoded(metadata) + b'\n'
+    files,directories,guard,budget = publication_plan(engine,static,current,metadata_bytes)
+    guard.check(budget)
     candidate = engine.private / "staging" / uuid.uuid4().hex
-    copy_static(static, candidate)
-    # Retain old hashed assets so a tab opened before the swap still works.
-    if current:
-        old_assets = engine.public / "sites" / current / "assets"
-        if old_assets.is_dir():
-            for old in old_assets.rglob("*"):
-                require(not old.is_symlink(), "OLD_ASSET_SYMLINK")
-                if old.is_file():
-                    target = candidate / "assets" / old.relative_to(old_assets)
-                    if target.exists():
-                        require(digest(target) == digest(old), "STATIC_ASSET_NAME_COLLISION")
-                    else:
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copyfile(old, target)
-    metadata = {"schema": 1, "commit": commit, "pins": source_pins(source)}
-    atomic_json(candidate / "_amber-deployment.json", metadata, 0o644)
+    guard.directory(candidate)
+    for directory in sorted(directories,key=lambda p:(len(Path(p).parts),p)):
+        if directory != '.':
+            guard.directory(candidate / directory)
+    for name,(path,size) in sorted(files.items()):
+        guard.copy(path,candidate / name,size)
+    guard.write(metadata_bytes,candidate / '_amber-deployment.json')
     validate_static(candidate)
     for path in candidate.rglob("*"):
         path.chmod(0o755 if path.is_dir() else 0o644)
     candidate.chmod(0o755)
     sync_tree(candidate)
+    guard.check(65536 + len(encoded(engine.state)))
     os.replace(candidate, destination)
     sync_dir(destination.parent)
     switch(engine, commit, current)
@@ -260,8 +328,8 @@ def publish_site(engine, source, static, commit):
     log("website_published", commit=commit, previous=current)
 
 
-def isolated_build(work, tools):
-    """Called only inside the root-owned systemd build jail, as amber-build."""
+def build_tools(work, tools):
+    """Validate the exact toolchain and return a CLEAN process environment."""
     require(os.name == "posix" and os.getuid() != 0, "UNPRIVILEGED_LINUX_BUILDER_REQUIRED")
     marker = Path('/.amber-build-jail')
     require(marker.is_file() and marker.stat().st_uid == 0 and
@@ -282,16 +350,42 @@ def isolated_build(work, tools):
             (work / ".node-version").read_text().strip() == NODE,
             "REPOSITORY_TOOL_PIN_MISMATCH")
     require((work / "pnpm-lock.yaml").is_file(), "LOCKFILE_MISSING")
-    lock_hash = digest(work / "pnpm-lock.yaml")
-    command(pnpm + ["install", "--frozen-lockfile", "--ignore-scripts", "--store-dir", str(work / '.store')],
-            work, env, timeout=600)
+    return pnpm,env
+
+
+def install_dependencies(work,tools):
+    from network_guard import network_guard
+    from registry_proxy import install_bridge
+    policy=network_guard(work,'install')
+    pnpm,env=build_tools(work,tools)
+    lock_hash=digest(work/'pnpm-lock.yaml')
+    with install_bridge() as proxy:
+        env.update(HTTPS_PROXY=proxy,HTTP_PROXY=proxy,https_proxy=proxy,http_proxy=proxy,
+                   NO_PROXY='',no_proxy='',NODE_TLS_REJECT_UNAUTHORIZED='1')
+        command(pnpm+['install','--frozen-lockfile','--ignore-scripts','--ignore-pnpmfile',
+                     '--strict-ssl=true','--registry=https://registry.npmjs.org/',
+                     '--https-proxy='+proxy,'--proxy='+proxy,'--store-dir',str(work/'.store')],
+                work,env,timeout=600)
+    require(digest(work/'pnpm-lock.yaml')==lock_hash,'INSTALL_CHANGED_LOCKFILE')
+    policy['registry_proxy']='registry.npmjs.org:443'
+    return policy
+
+
+def isolated_build(work, tools):
+    """Offline unit only: no IP socket families and no proxy socket mount."""
+    from network_guard import network_guard
+    policy=network_guard(work,'offline')
+    pnpm,env=build_tools(work,tools)
+    lock_hash=digest(work/'pnpm-lock.yaml')
     command(pnpm + ["build"], work, env, timeout=300)
     command(pnpm + ["test:sites"], work, env, timeout=120)
     command(pnpm + ["test:mirror"], work, env, timeout=120)
     require(digest(work / "pnpm-lock.yaml") == lock_hash, "BUILD_CHANGED_LOCKFILE")
+    return policy
 
 
 def sync_website(engine):
+    recover_website(engine)
     require(not (engine.state.get("website") or {}).get("paused"), "WEBSITE_PAUSED_AFTER_ROLLBACK")
     head = engine.api.json(f"/repos/{WEBSITE}/branches/main")["commit"]["sha"]
     require(COMMIT.fullmatch(head), "INVALID_MAIN_COMMIT")

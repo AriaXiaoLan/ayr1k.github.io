@@ -1,0 +1,28 @@
+[Unit]
+Description=Restricted AMBER npm registry CONNECT proxy
+Requires=amber-fetch-proxy.socket
+After=amber-fetch-proxy.socket
+
+[Service]
+User=amber-fetch
+Group=amber-fetch
+ExecStart=/usr/bin/python3 /usr/local/lib/amber-sync/registry_proxy.py
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectProc=invisible
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+InaccessiblePaths=-/srv/amber-sync -/srv/amber-web-build -/srv/amber-web-requests -/etc/letsencrypt
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=128M
+TasksMax=64
+UMask=0077
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal

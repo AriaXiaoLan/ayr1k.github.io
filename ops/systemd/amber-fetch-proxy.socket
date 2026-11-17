@@ -1,0 +1,13 @@
+[Unit]
+Description=Private Unix socket for AMBER registry egress
+
+[Socket]
+ListenStream=/run/amber-fetch-proxy/egress.sock
+SocketUser=amber-fetch
+SocketGroup=amber-build
+SocketMode=0660
+DirectoryMode=0755
+Accept=no
+
+[Install]
+WantedBy=sockets.target

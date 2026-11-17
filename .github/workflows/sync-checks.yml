@@ -11,7 +11,7 @@ permissions:
 jobs:
   sandbox:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
       - name: Prepare exact verified build tools
@@ -23,7 +23,7 @@ jobs:
       - name: Show isolated test diagnostics on failure
         if: failure()
         run: |
-          sudo journalctl -u amber-web-build.service -n 60 --no-pager
+          sudo journalctl -u amber-web-install.service -u amber-web-build.service -u amber-fetch-proxy.service -n 100 --no-pager
           sudo find /srv/amber-web-build/work -name command-failure.log -type f -exec tail -c 8000 {} \;
   verify:
     runs-on: ubuntu-24.04
