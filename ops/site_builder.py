@@ -387,11 +387,14 @@ def isolated_build(work, tools):
     policy=network_guard(work,'offline')
     pnpm,env=build_tools(work,tools)
     lock_hash=digest(work/'pnpm-lock.yaml')
-    # pnpm 11's `run` parser requires configuration overrides in --config form.
-    runner=pnpm+['--config.ignore-pnpmfile=true','run']
-    command(runner + ["build"], work, env, timeout=300)
-    command(runner + ["test:sites"], work, env, timeout=120)
-    command(runner + ["test:mirror"], work, env, timeout=120)
+    # pnpm 11 `run` may auto-install. Execute the repository's exact scripts
+    # directly here; dependency installation belongs ONLY to the previous unit.
+    scripts=json.loads((work/'package.json').read_text())['scripts']
+    env['PATH']=str(work/'node_modules/.bin')+':'+env['PATH']
+    for task,timeout in (('build',300),('test:sites',120),('test:mirror',120)):
+        script=scripts.get(task)
+        require(isinstance(script,str) and script and '\0' not in script,'REQUIRED_BUILD_SCRIPT_MISSING')
+        command(['/bin/sh','-c',script],work,{**env,'npm_lifecycle_event':task},timeout=timeout)
     require(digest(work / "pnpm-lock.yaml") == lock_hash, "BUILD_CHANGED_LOCKFILE")
     return policy
 
