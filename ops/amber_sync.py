@@ -478,10 +478,10 @@ class Engine:
                 require(version in releases, "MANAGED_RELEASE_REMOVED_OR_NOT_STABLE")
                 release = releases[version]
                 record_id = product + "/" + version
-                if record_id not in self.state["records"]:
+                new_version = record_id not in self.state["records"]
+                if new_version:
                     if transferred >= self.config.get("backfill_per_run", 1):
                         continue
-                    transferred += 1
                 # Enumerate the asset endpoint; do not assume an embedded array
                 # in a collection response is complete.
                 full = self.api.inspect(PRODUCTS[product], release)
@@ -489,6 +489,8 @@ class Engine:
                         "RELEASE_CHANGED_DURING_INSPECTION")
                 release = full
                 result = self.sync_release(product, release)
+                if new_version and result == 'published':
+                    transferred += 1
                 log("release", product=product, version=version, result=result)
             except (SyncError, OSError, ValueError, KeyError, TypeError) as exc:
                 code = str(exc) if isinstance(exc, SyncError) else type(exc).__name__

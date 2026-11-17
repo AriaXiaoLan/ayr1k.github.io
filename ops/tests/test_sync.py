@@ -152,6 +152,15 @@ class SyncTests(unittest.TestCase):
             self.engine.sync_release("AMBER", release)
         self.assertFalse((self.root / "public/mirror/amber/1.7.4").exists())
 
+    def test_invalid_newest_does_not_starve_verified_backfill_or_hide_failure(self):
+        bad = self.api.add(version='1.7.5')
+        bad['assets'][0]['digest'] = None
+        self.api.add(version='1.7.4')
+        with self.assertRaisesRegex(sync.SyncError,'PRODUCT_SYNC_FAILED'):
+            self.engine.sync_product('AMBER')
+        self.assertNotIn('AMBER/1.7.5',self.engine.state['records'])
+        self.assertIn('AMBER/1.7.4',self.engine.state['records'])
+
     def test_missing_metadata_digest_also_refused(self):
         release = self.api.add()
         release["assets"][-1]["digest"] = ""
