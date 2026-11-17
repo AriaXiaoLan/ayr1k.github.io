@@ -125,7 +125,7 @@ def job_context():
     require(request.get('schema')==2 and ID.fullmatch(job_id) and COMMIT.fullmatch(commit),
             'INVALID_BUILD_REQUEST')
     result_dir=confined(root,'results/'+job_id)
-    result_dir.mkdir(parents=True,mode=0o750)
+    result_dir.mkdir(parents=True,mode=0o750,exist_ok=True)
     return root,requests,tools,request,result_dir
 
 
