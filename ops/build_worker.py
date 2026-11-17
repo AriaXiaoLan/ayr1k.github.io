@@ -21,7 +21,7 @@ import uuid
 
 from amber_sync import (SyncError, atomic_json, confined, digest, locked, log,
                         require, sync_tree)
-from site_builder import COMMIT, extract_source, isolated_build, source_pins, validate_static
+from site_builder import COMMIT, copy_static, extract_source, isolated_build, source_pins, validate_static
 
 ID = re.compile(r"[a-f0-9]{32}\Z")
 
@@ -59,7 +59,7 @@ def accept_result(engine, result_root, job_id, commit, pins):
     # Copy out of the other identity's storage, then recheck every byte. Never
     # publish a tree still controlled by a build process or containing links.
     candidate = engine.private / 'staging' / uuid.uuid4().hex
-    shutil.copytree(static, candidate, symlinks=False)
+    copy_static(static, candidate)
     require(static_hashes(candidate) == result['files'], 'BUILD_RESULT_CHANGED_DURING_COPY')
     return candidate
 
@@ -86,7 +86,8 @@ def request_build(engine, source, commit):
     pins = source_pins(source)
     request = {'schema':1, 'id':job_id, 'commit':commit, 'source_sha256':digest(archive_path), 'pins':pins}
     atomic_json(requests / 'request.json', request, 0o640)
-    deadline = time.monotonic() + engine.config.get('builder_timeout_seconds', 900)
+    started = time.monotonic()
+    deadline = started + engine.config.get('builder_timeout_seconds', 900)
     result_path = confined(results, job_id + '/result.json')
     while time.monotonic() < deadline:
         state = service_state()
@@ -97,7 +98,9 @@ def request_build(engine, source, commit):
                 result = json.loads(result_path.read_text())
                 require(result.get('ok') is not True, 'BUILD_SERVICE_FAILED_AFTER_RESULT')
             return accept_result(engine, results, job_id, commit, pins)
-        if state == 'failed':
+        # The prior invocation may still be marked failed while systemd.path
+        # processes this new request. Allow it time to start the new job.
+        if state == 'failed' and time.monotonic() - started >= 10:
             raise SyncError('BUILD_SERVICE_FAILED')
         time.sleep(1)
     raise SyncError('BUILD_SERVICE_TIMEOUT')
@@ -135,7 +138,7 @@ def work_once():
         static = source / 'dist/client'
         files = static_hashes(static)
         destination = result_dir / 'site'
-        shutil.copytree(static, destination, symlinks=False)
+        copy_static(static, destination)
         require(static_hashes(destination) == files, 'BUILD_OUTPUT_COPY_INTEGRITY')
         for path in destination.rglob('*'):
             path.chmod(0o750 if path.is_dir() else 0o640)

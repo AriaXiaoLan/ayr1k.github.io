@@ -125,6 +125,29 @@ def validate_static(directory):
     return count
 
 
+def copy_static(source, destination, file_mode=0o640, directory_mode=0o750):
+    """Copy bytes only, with explicit permissions; never carry setgid or xattrs.
+
+    Builder directories inherit the sync group for read access. The builder
+    deliberately is not a member of that group, so copying setgid metadata
+    with shutil.copytree/copystat can fail or propagate unwanted permissions.
+    """
+    validate_static(source)
+    require(not destination.exists(), 'STATIC_COPY_DESTINATION_EXISTS')
+    destination.mkdir(mode=directory_mode)
+    for path in sorted(source.rglob('*')):
+        target = destination / path.relative_to(source)
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True, mode=directory_mode)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True, mode=directory_mode)
+            shutil.copyfile(path, target)
+            target.chmod(file_mode)
+    for directory in sorted((p for p in destination.rglob('*') if p.is_dir()), reverse=True):
+        directory.chmod(directory_mode)
+    destination.chmod(directory_mode)
+
+
 def deployment(engine, name):
     require(COMMIT.fullmatch(name), "INVALID_DEPLOYMENT_NAME")
     path = confined(engine.root, "public/sites/" + name)
@@ -208,7 +231,7 @@ def publish_site(engine, source, static, commit):
     require(not destination.exists(), "DEPLOYMENT_ALREADY_EXISTS")
     engine.space(sum(p.stat().st_size for p in static.rglob("*") if p.is_file()))
     candidate = engine.private / "staging" / uuid.uuid4().hex
-    shutil.copytree(static, candidate, symlinks=False)
+    copy_static(static, candidate)
     # Retain old hashed assets so a tab opened before the swap still works.
     if current:
         old_assets = engine.public / "sites" / current / "assets"

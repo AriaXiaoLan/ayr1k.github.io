@@ -55,6 +55,9 @@ class FakeAPI:
     def release(self, repo, release_id):
         return copy.deepcopy(next(r for r in self.data[repo] if r["id"] == release_id))
 
+    def inspect(self, repo, release):
+        return self.release(repo, release['id'])
+
     def download(self, asset, destination):
         self.downloads += 1
         destination.write_bytes(self.payloads[asset["url"]])
@@ -439,6 +442,29 @@ class WorkerProtocolTests(unittest.TestCase):
         candidate = worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
         self.assertTrue(candidate.is_relative_to(self.engine.private))
         self.assertEqual(worker.static_hashes(candidate),self.result['files'])
+
+    def test_new_request_can_start_after_prior_service_failure(self):
+        requests = self.root / 'requests'
+        requests.mkdir()
+        self.engine.config.update(builder_requests=str(requests),builder_results=str(self.results))
+        source = self.root / 'source'
+        (source / 'src').mkdir(parents=True)
+        (source / 'src/download-catalog.json').write_text(json.dumps({
+            p:{'repo':repo,'version':'1.7.4'} for p,repo in sync.PRODUCTS.items()}))
+        (self.job / 'result.json').unlink()  # disposable test fixture only
+        calls = []
+        def state():
+            calls.append(True)
+            if len(calls) == 1:
+                return 'failed'
+            self.write_result()
+            return 'inactive'
+        with patch('build_worker.uuid.uuid4') as random_id, \
+             patch('build_worker.service_state',side_effect=state), \
+             patch('build_worker.time.sleep'):
+            random_id.return_value.hex = self.job_id
+            candidate = worker.request_build(self.engine,source,self.commit)
+        self.assertTrue((candidate / 'index.html').exists())
 
     def test_other_commit_or_job_refused(self):
         for field in ('id','commit'):

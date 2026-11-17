@@ -218,6 +218,11 @@ class GitHub:
         result["assets"] = self.pages(f"/repos/{repo}/releases/{release_id}/assets")
         return result
 
+    def inspect(self, repo, release):
+        result = dict(release)
+        result["assets"] = self.pages(f"/repos/{repo}/releases/{release['id']}/assets")
+        return result
+
     def download(self, asset, destination):
         """Restart bounded failed transfers; never append or execute payloads."""
         for attempt in range(3):
@@ -479,7 +484,7 @@ class Engine:
                     transferred += 1
                 # Enumerate the asset endpoint; do not assume an embedded array
                 # in a collection response is complete.
-                full = self.api.release(PRODUCTS[product], release["id"])
+                full = self.api.inspect(PRODUCTS[product], release)
                 require(full.get("id") == release["id"] and full.get("tag_name") == "v" + version,
                         "RELEASE_CHANGED_DURING_INSPECTION")
                 release = full
