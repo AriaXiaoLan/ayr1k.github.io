@@ -126,7 +126,7 @@ def validate_static(directory):
     return count
 
 
-def copy_static(source, destination, file_mode=0o640, directory_mode=0o750):
+def copy_static(source, destination, file_mode=0o640, directory_mode=0o750, space=None):
     """Copy bytes only, with explicit permissions; never carry setgid or xattrs.
 
     Builder directories inherit the sync group for read access. The builder
@@ -135,14 +135,22 @@ def copy_static(source, destination, file_mode=0o640, directory_mode=0o750):
     """
     validate_static(source)
     require(not destination.exists(), 'STATIC_COPY_DESTINATION_EXISTS')
-    destination.mkdir(mode=directory_mode)
+    if space:
+        files=[p for p in source.rglob('*') if p.is_file()]
+        dirs=[p for p in source.rglob('*') if p.is_dir()]
+        space.check(sum(space.allocated(p.stat().st_size) for p in files)+(len(dirs)+1)*space.block+65536)
+        space.directory(destination)
+    else:
+        destination.mkdir(mode=directory_mode)
     for path in sorted(source.rglob('*')):
         target = destination / path.relative_to(source)
         if path.is_dir():
-            target.mkdir(parents=True, exist_ok=True, mode=directory_mode)
+            if space: space.directory(target)
+            else: target.mkdir(parents=True, exist_ok=True, mode=directory_mode)
         else:
             target.parent.mkdir(parents=True, exist_ok=True, mode=directory_mode)
-            shutil.copyfile(path, target)
+            if space: space.copy(path,target,path.stat().st_size)
+            else: shutil.copyfile(path, target)
             target.chmod(file_mode)
     for directory in sorted((p for p in destination.rglob('*') if p.is_dir()), reverse=True):
         directory.chmod(directory_mode)
@@ -338,11 +346,12 @@ def build_tools(work, tools):
             (tools / 'node/bin/node').is_file() and (tools / 'pnpm/bin/pnpm.cjs').is_file(),
             "PINNED_TOOLS_MISSING")
     env = {"PATH": "/tools/node/bin:/usr/bin:/bin", "HOME": str(work / '.home'),
-           "CI": "true", "LANG": "C.UTF-8"}
+           "CI": "true", "LANG": "C.UTF-8", 'pnpm_config_ignore_pnpmfile':'true'}
     node = '/tools/node/bin/node'
     require(command([node, "--version"], work, env).decode().strip() == "v" + NODE,
             "NODE_VERSION_MISMATCH")
-    pnpm = [node, "/tools/pnpm/bin/pnpm.cjs"]
+    # Even `pnpm --version` can load project hooks unless explicitly disabled.
+    pnpm = [node, "/tools/pnpm/bin/pnpm.cjs", '--ignore-pnpmfile']
     require(command(pnpm + ["--version"], work, env).decode().strip() == PNPM,
             "PNPM_VERSION_MISMATCH")
     package = json.loads((work / "package.json").read_text())
@@ -362,7 +371,7 @@ def install_dependencies(work,tools):
     with install_bridge() as proxy:
         env.update(HTTPS_PROXY=proxy,HTTP_PROXY=proxy,https_proxy=proxy,http_proxy=proxy,
                    NO_PROXY='',no_proxy='',NODE_TLS_REJECT_UNAUTHORIZED='1')
-        command(pnpm+['install','--frozen-lockfile','--ignore-scripts','--ignore-pnpmfile',
+        command(pnpm+['install','--frozen-lockfile','--ignore-scripts',
                      '--strict-ssl=true','--registry=https://registry.npmjs.org/',
                      '--https-proxy='+proxy,'--proxy='+proxy,'--store-dir',str(work/'.store')],
                 work,env,timeout=600)

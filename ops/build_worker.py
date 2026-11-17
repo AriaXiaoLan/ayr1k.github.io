@@ -22,6 +22,7 @@ import uuid
 from amber_sync import (SyncError, atomic_json, confined, digest, locked, log,
                         require, sync_tree)
 from site_builder import COMMIT, copy_static, extract_source, isolated_build, source_pins, validate_static, install_dependencies
+from storage import PublicationSpace
 
 ID = re.compile(r"[a-f0-9]{32}\Z")
 
@@ -67,7 +68,7 @@ def accept_result(engine, result_root, job_id, commit, pins):
     # Copy out of the other identity's storage, then recheck every byte. Never
     # publish a tree still controlled by a build process or containing links.
     candidate = engine.private / 'staging' / uuid.uuid4().hex
-    copy_static(static, candidate)
+    copy_static(static, candidate, space=PublicationSpace(engine))
     require(static_hashes(candidate) == result['files'], 'BUILD_RESULT_CHANGED_DURING_COPY')
     return candidate
 

@@ -451,11 +451,13 @@ class WorkerProtocolTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    @unittest.skipUnless(os.name=='posix','POSIX preallocation for publication copies')
     def test_verified_worker_result_copied_to_sync_storage(self):
         candidate = worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
         self.assertTrue(candidate.is_relative_to(self.engine.private))
         self.assertEqual(worker.static_hashes(candidate),self.result['files'])
 
+    @unittest.skipUnless(os.name=='posix','POSIX preallocation for publication copies')
     def test_new_request_can_start_after_prior_service_failure(self):
         requests = self.root / 'requests'
         requests.mkdir()
