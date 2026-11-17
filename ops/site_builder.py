@@ -372,8 +372,9 @@ def install_dependencies(work,tools):
         env.update(HTTPS_PROXY=proxy,HTTP_PROXY=proxy,https_proxy=proxy,http_proxy=proxy,
                    NO_PROXY='',no_proxy='',NODE_TLS_REJECT_UNAUTHORIZED='1')
         command(pnpm+['install','--frozen-lockfile','--ignore-scripts',
-                     '--strict-ssl=true','--registry=https://registry.npmjs.org/',
-                     '--https-proxy='+proxy,'--proxy='+proxy,'--store-dir',str(work/'.store')],
+                     '--config.strict-ssl=true','--registry=https://registry.npmjs.org/',
+                     '--config.https-proxy='+proxy,'--config.proxy='+proxy,
+                     '--config.network-concurrency=8','--store-dir',str(work/'.store')],
                 work,env,timeout=600)
     require(digest(work/'pnpm-lock.yaml')==lock_hash,'INSTALL_CHANGED_LOCKFILE')
     policy['registry_proxy']='registry.npmjs.org:443'
