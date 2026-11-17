@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -266,7 +267,16 @@ def select_releases(releases):
 
 def release_record(product, release):
     repo = PRODUCTS[product]
+    require(type(release.get("draft")) is bool and type(release.get("prerelease")) is bool and
+            type(release.get("id")) is int and release["id"] > 0,
+            "INVALID_RELEASE_IDENTITY")
     require(not release.get("draft") and not release.get("prerelease"), "NOT_STABLE")
+    published = release.get("published_at", "")
+    require(isinstance(published, str) and published.endswith("Z"), "INVALID_PUBLICATION_TIME")
+    try:
+        datetime.fromisoformat(published)
+    except ValueError:
+        raise SyncError("INVALID_PUBLICATION_TIME") from None
     version = release["tag_name"][1:]
     key(version)
     prefix = f"{product}-{version}-"

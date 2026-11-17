@@ -20,6 +20,12 @@ jobs:
         run: python3 ops/bootstrap_tools.py "$RUNNER_TEMP/amber-tools"
       - name: Verify real isolated install, build, tests and filesystem boundary
         run: python3 ops/tests/validate_sandbox.py --tools "$RUNNER_TEMP/amber-tools" --scratch "$RUNNER_TEMP/amber-sandbox-validation"
+      - name: Show isolated test diagnostics on failure
+        if: failure()
+        run: |
+          if test -f "$RUNNER_TEMP/amber-sandbox-validation/source/command-failure.log"; then
+            tail -c 8000 "$RUNNER_TEMP/amber-sandbox-validation/source/command-failure.log"
+          fi
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
