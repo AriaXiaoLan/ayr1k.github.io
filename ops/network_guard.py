@@ -32,7 +32,10 @@ def network_guard(source,phase):
         require({name for _,name in socket.if_nameindex()}=={'lo'},'INSTALL_NETWORK_NAMESPACE_REQUIRED')
         denials=proxy_denials()
     else:
-        require(not Path('/proxy').exists(),'OFFLINE_PROXY_MOUNT_PRESENT')
+        # A previous unit may leave an EMPTY mountpoint in the shared jail.
+        # Reject an actual mount or socket, without mistaking that directory for egress.
+        require(not os.path.ismount('/proxy') and not Path('/proxy/egress.sock').exists(),
+                'OFFLINE_PROXY_MOUNT_PRESENT')
         for family in (socket.AF_INET,socket.AF_INET6):
             try:
                 connection=socket.socket(family,socket.SOCK_STREAM)
