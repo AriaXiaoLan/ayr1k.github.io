@@ -351,8 +351,8 @@ def build_tools(work, tools):
     require(command([node, "--version"], work, env).decode().strip() == "v" + NODE,
             "NODE_VERSION_MISMATCH")
     # Even `pnpm --version` can load project hooks unless explicitly disabled.
-    pnpm = [node, "/tools/pnpm/bin/pnpm.cjs", '--ignore-pnpmfile']
-    require(command(pnpm + ["--version"], work, env).decode().strip() == PNPM,
+    pnpm = [node, "/tools/pnpm/bin/pnpm.cjs"]
+    require(command(pnpm + ['--ignore-pnpmfile',"--version"], work, env).decode().strip() == PNPM,
             "PNPM_VERSION_MISMATCH")
     package = json.loads((work / "package.json").read_text())
     require(package.get("packageManager") == "pnpm@" + PNPM and
@@ -371,7 +371,7 @@ def install_dependencies(work,tools):
     with install_bridge() as proxy:
         env.update(HTTPS_PROXY=proxy,HTTP_PROXY=proxy,https_proxy=proxy,http_proxy=proxy,
                    NO_PROXY='',no_proxy='',NODE_TLS_REJECT_UNAUTHORIZED='1')
-        command(pnpm+['install','--frozen-lockfile','--ignore-scripts',
+        command(pnpm+['install','--frozen-lockfile','--ignore-scripts','--ignore-pnpmfile',
                      '--config.strict-ssl=true','--registry=https://registry.npmjs.org/',
                      '--config.https-proxy='+proxy,'--config.proxy='+proxy,
                      '--network-concurrency=8','--store-dir',str(work/'.store')],
@@ -387,9 +387,11 @@ def isolated_build(work, tools):
     policy=network_guard(work,'offline')
     pnpm,env=build_tools(work,tools)
     lock_hash=digest(work/'pnpm-lock.yaml')
-    command(pnpm + ["build"], work, env, timeout=300)
-    command(pnpm + ["test:sites"], work, env, timeout=120)
-    command(pnpm + ["test:mirror"], work, env, timeout=120)
+    # pnpm 11's `run` parser requires configuration overrides in --config form.
+    runner=pnpm+['--config.ignore-pnpmfile=true','run']
+    command(runner + ["build"], work, env, timeout=300)
+    command(runner + ["test:sites"], work, env, timeout=120)
+    command(runner + ["test:mirror"], work, env, timeout=120)
     require(digest(work / "pnpm-lock.yaml") == lock_hash, "BUILD_CHANGED_LOCKFILE")
     return policy
 
