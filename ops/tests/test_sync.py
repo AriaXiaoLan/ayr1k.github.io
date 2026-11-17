@@ -408,6 +408,10 @@ class ValidationTests(unittest.TestCase):
             (root / "index.html").write_text('<script src="/assets/missing.js"></script>')
             with self.assertRaisesRegex(sync.SyncError, "STATIC_REFERENCE_MISSING"):
                 site.validate_static(root)
+            (root / "index.html").write_text('<p>working</p>')
+            (root / "private.key").write_text('fixture')
+            with self.assertRaisesRegex(sync.SyncError, "NON_STATIC_OR_SECRET_FILE"):
+                site.validate_static(root)
 
 
 class WorkerProtocolTests(unittest.TestCase):
@@ -464,10 +468,6 @@ class WorkerProtocolTests(unittest.TestCase):
             self.write_result()
             with self.assertRaisesRegex(sync.SyncError,expected):
                 worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
-            (root / "index.html").write_text('<p>working</p>')
-            (root / "private.key").write_text('fixture')
-            with self.assertRaisesRegex(sync.SyncError, "NON_STATIC_OR_SECRET_FILE"):
-                site.validate_static(root)
 
     @unittest.skipUnless(os.name == "posix", "Linux deployment symlinks; CI runs these tests")
     def test_symlink_boundary(self):

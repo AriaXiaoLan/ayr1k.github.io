@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 import time
+import traceback
 import uuid
 
 from amber_sync import (SyncError, atomic_json, confined, digest, locked, log,
@@ -144,7 +145,11 @@ def work_once():
     except Exception as exc:
         code = str(exc) if isinstance(exc, SyncError) else 'BUILD_WORKER_INTERNAL_ERROR'
         result = {'schema':1, 'id':job_id, 'commit':commit, 'ok':False, 'code':code}
-        log('build_failed', id=job_id, code=code)
+        # Exception text and subprocess output can contain credentials in future
+        # dependencies. Record only type and public source locations in journal.
+        frames = [{'file':Path(f.filename).name,'line':f.lineno,'function':f.name}
+                  for f in traceback.extract_tb(exc.__traceback__)[-6:]]
+        log('build_failed', id=job_id, code=code, error_type=type(exc).__name__, frames=frames)
     atomic_json(result_path, result, 0o640)
     require(result['ok'], result.get('code', 'BUILD_FAILED'))
 

@@ -138,8 +138,13 @@ pnpm test:sites
 pnpm test:mirror
 PYTHONPATH=ops python3 -c 'from pathlib import Path; from site_builder import validate_static; print(validate_static(Path("dist/client")))'
 # 必须实际验证生产使用的沙箱：全新 scratch 目录，不指向原站点或 runtime。
-# 请求/结果目录按上述权限预置；以无 sudo 的同步身份验证，不以 root 运行。
-sudo -u amber-sync python3 ops/tests/validate_sandbox.py --scratch /srv/amber-sync/private/worker-validation
+# 请求/结果目录按上述权限预置；将审核过的 tracked 源码放在全新 /srv/amber-review，
+# root 拥有、amber-sync 组只读；不授权服务账户读取管理员的 home。
+sudo install -d -o root -g amber-sync -m 750 /srv/amber-review
+git archive HEAD | sudo tar -x -C /srv/amber-review
+sudo chown -R root:amber-sync /srv/amber-review
+sudo chmod -R u+rwX,g+rX,o-rwx /srv/amber-review
+sudo -u amber-sync python3 /srv/amber-review/ops/tests/validate_sandbox.py --scratch /srv/amber-sync/private/worker-validation
 ```
 
 完成原补丁整合、备份及 Nginx 配置审阅后，管理员在服务器**本地**创建 `/etc/amber-sync/activation.json`，root:root 0644，填入两个备份文件的实际 SHA-256。不要照抄占位值：
