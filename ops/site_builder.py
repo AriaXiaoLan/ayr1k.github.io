@@ -215,6 +215,8 @@ def switch(engine, current, previous):
     if previous:
         os.symlink("../../sites/" + previous, generation / "previous")
     sync_dir(generation)
+    # Persist the generation's directory entry before active can reference it.
+    sync_dir(generation.parent)
     link = engine.public / ("active-" + uuid.uuid4().hex)
     os.symlink("site-sets/" + generation.name, link)
     os.replace(link, engine.public / "active")

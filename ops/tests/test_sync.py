@@ -555,6 +555,26 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(site.active_pair(self.engine), ("b" * 40, "a" * 40))
         self.assertTrue((self.root / "public/mirror/amber/1.7.4").exists())
 
+    def test_generation_and_parent_fsync_precede_active_replace(self):
+        self.create_site('a'*40,'1.0.1')
+        self.create_site('b'*40,'1.0.2')
+        events=[]
+        real_sync,real_replace=site.sync_dir,os.replace
+        def synced(path):
+            events.append(('fsync',Path(path)))
+            real_sync(path)
+        def replaced(source,target):
+            events.append(('replace',Path(target)))
+            real_replace(source,target)
+        with patch('site_builder.sync_dir',side_effect=synced), \
+             patch('site_builder.os.replace',side_effect=replaced):
+            site.switch(self.engine,'a'*40,'b'*40)
+        generation=events[0][1]
+        self.assertEqual(generation.parent,self.engine.public/'site-sets')
+        self.assertEqual(events,[('fsync',generation),('fsync',generation.parent),
+                                 ('replace',self.engine.public/'active'),('fsync',self.engine.public)])
+        self.assertEqual(site.active_pair(self.engine),('a'*40,'b'*40))
+
     def test_pointer_failure_preserves_current_and_previous(self):
         self.create_site("a" * 40, "1.0.1")
         self.create_site("b" * 40, "1.0.2")
