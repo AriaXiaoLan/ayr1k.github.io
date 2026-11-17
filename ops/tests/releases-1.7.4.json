@@ -1,0 +1,164 @@
+{
+  "AMBER": {
+    "id": 448122620,
+    "tag_name": "v1.7.4",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-11-17T04:22:22Z",
+    "assets": [
+      {
+        "id": 757585798,
+        "name": "AMBER-1.7.4-freebsd-x64-experimental.tar.gz",
+        "size": 41291905,
+        "digest": "sha256:e863b6e267fdf997395f05a838d0467e476473874c08d7b5a62ec6e1c8a9d907",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:16:08Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-freebsd-x64-experimental.tar.gz"
+      },
+      {
+        "id": 757586274,
+        "name": "AMBER-1.7.4-linux-x64.deb",
+        "size": 165674786,
+        "digest": "sha256:7b66c5f6bf3f279f959b9ee9226541e8c65786150b3fe8d85bbf874ff6286b42",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:16:47Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-linux-x64.deb"
+      },
+      {
+        "id": 757587828,
+        "name": "AMBER-1.7.4-mac-arm64.zip",
+        "size": 162158920,
+        "digest": "sha256:84451d1be6e5897e2c99e7aee6b16b94db7376c68e3ea760b4fb4b48e33e3c9f",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:17:23Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-mac-arm64.zip"
+      },
+      {
+        "id": 757589775,
+        "name": "AMBER-1.7.4-mac-x64.zip",
+        "size": 166558210,
+        "digest": "sha256:a09f38be3c9d4ce77edf588a212a75ea3db4a2ff9e77c8c40602f4a3ae41c248",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:18:00Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-mac-x64.zip"
+      },
+      {
+        "id": 757591481,
+        "name": "AMBER-1.7.4-Setup-x64.exe",
+        "size": 153457144,
+        "digest": "sha256:ff0f60991346b86d5438776206a051f184f9f2b11ee2e78ed97827d6bfd6f35e",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:18:34Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-Setup-x64.exe"
+      },
+      {
+        "id": 757592744,
+        "name": "AMBER-1.7.4-Setup-x64.exe.provenance.json",
+        "size": 259,
+        "digest": "sha256:1e834f9acf2057ca38c8af4dd7911255daa257364503e0a3e894ca3f23e332c0",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:18:34Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-Setup-x64.exe.provenance.json"
+      },
+      {
+        "id": 757592751,
+        "name": "AMBER-1.7.4-source.zip",
+        "size": 59819392,
+        "digest": "sha256:5de4076e8c10f7f5ef4ad2d3c1d7e3540b0079c6807ca25655fdb8053848e7a7",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:18:50Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/AMBER-1.7.4-source.zip"
+      },
+      {
+        "id": 757593412,
+        "name": "SHA256SUMS.txt",
+        "size": 680,
+        "digest": "sha256:65d6a5df0379d70c6f4c2e307bc9d818ad636070dd5ef4a3a74c9a9b0794e163",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:18:51Z",
+        "browser_download_url": "https://github.com/ayr1k/amber-launcher/releases/download/v1.7.4/SHA256SUMS.txt"
+      }
+    ]
+  },
+  "AmberE": {
+    "id": 448124771,
+    "tag_name": "v1.7.4",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-11-17T04:22:25Z",
+    "assets": [
+      {
+        "id": 757593558,
+        "name": "AmberE-1.7.4-freebsd-x64-experimental.tar.gz",
+        "size": 41288223,
+        "digest": "sha256:537016dfeeb26dbb1f70c1f2ebcad96a66099674dd2246a6a6b932c1f95c973a",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:19:03Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-freebsd-x64-experimental.tar.gz"
+      },
+      {
+        "id": 757594016,
+        "name": "AmberE-1.7.4-linux-x64.deb",
+        "size": 165671896,
+        "digest": "sha256:f5c83ac4b0cb3286f46e9b99003bb8b0d097b9ea5929902fed2ca95ea715fefe",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:19:42Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-linux-x64.deb"
+      },
+      {
+        "id": 757595741,
+        "name": "AmberE-1.7.4-mac-arm64.zip",
+        "size": 162157137,
+        "digest": "sha256:b429f28f8a3bf046474634b74c5a00967447724d421eb1b68105aad83ce55b79",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:20:20Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-mac-arm64.zip"
+      },
+      {
+        "id": 757597684,
+        "name": "AmberE-1.7.4-mac-x64.zip",
+        "size": 166556427,
+        "digest": "sha256:f24db94aff49a242f656ff41497a004c8b98753c952bb9acdd8a2841c6bc3ce9",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:20:57Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-mac-x64.zip"
+      },
+      {
+        "id": 757599298,
+        "name": "AmberE-1.7.4-Setup-x64.exe",
+        "size": 153451926,
+        "digest": "sha256:4b034bfc67791ec40a930fe9bbddfce9538895f1d47352e68f6d6b814b111dd5",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:21:40Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-Setup-x64.exe"
+      },
+      {
+        "id": 757600905,
+        "name": "AmberE-1.7.4-Setup-x64.exe.provenance.json",
+        "size": 260,
+        "digest": "sha256:106057d12f9434d02996d20e82ea41ca3e6f04a689536a11c4d6b04422568f09",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:21:41Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-Setup-x64.exe.provenance.json"
+      },
+      {
+        "id": 757600922,
+        "name": "AmberE-1.7.4-source.zip",
+        "size": 59776748,
+        "digest": "sha256:22b4c85b741f13a63f4b094878bf06b19101209abd27ba5ba9e10ffc7bae5ac4",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:21:56Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/AmberE-1.7.4-source.zip"
+      },
+      {
+        "id": 757601574,
+        "name": "SHA256SUMS.txt",
+        "size": 687,
+        "digest": "sha256:912dd4264908ffeb6ff2ffa030d213b2df612293e9085b719b01ef2de374ee33",
+        "state": "uploaded",
+        "updated_at": "2026-11-17T04:21:57Z",
+        "browser_download_url": "https://github.com/ayr1k/AmberE/releases/download/v1.7.4/SHA256SUMS.txt"
+      }
+    ]
+  }
+}

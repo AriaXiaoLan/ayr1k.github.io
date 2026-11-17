@@ -15,3 +15,5 @@
 .download-page .download-links{border-top:0}
 @media(max-width:900px){.platform-download{grid-template-columns:170px minmax(0,1fr)}.platform-actions{grid-column:2;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}.download-page .download-main{gap:18px}}
 @media(max-width:580px){.platform-download{grid-template-columns:minmax(0,1fr);gap:20px;padding:26px 0}.platform-actions{grid-column:1}.platform-heading h3{font-size:23px}.platform-description p{font-size:14px}.download-page .download-main h2 span{white-space:nowrap}.download-page .edition-switch{margin-top:28px}}
+
+.platform-actions .mirror-download{background:transparent;border:1px solid var(--line);color:var(--text);font-size:12px;min-height:40px}

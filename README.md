@@ -1,5 +1,8 @@
 # AMBER website / AMBER 官网
 
+Server website / verified download mirror: see [deployment and rollback runbook](ops/README.md).
+The mirror is optional; existing GitHub downloads and GitHub Pages remain supported.
+
 [官方网站 / Website](https://ayr1k.github.io/) · [官方主题商城 / Official theme store](https://ayr1k.github.io/#/themes)
 
 AMBER 与 AmberE 的双语产品网站，提供功能介绍、使用帮助和 1.3.5 正式版下载。主页沿用深绿、琥珀配色与真实产品截图，使用自由滚动；功能与帮助页以阅读为主，不启用滚动吸附。

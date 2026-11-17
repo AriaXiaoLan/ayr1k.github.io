@@ -1,0 +1,11 @@
+[Unit]
+Description=Check AMBER website and both stable Release channels every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+RandomizedDelaySec=60s
+Persistent=true
+Unit=amber-sync.service
+
+[Install]
+WantedBy=timers.target
