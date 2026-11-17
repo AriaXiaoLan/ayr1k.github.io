@@ -1,6 +1,9 @@
 {
   "root": "/srv/amber-sync",
   "tools": "/opt/amber-web-tools",
+  "builder_requests": "/srv/amber-web-requests",
+  "builder_results": "/srv/amber-web-build/results",
+  "builder_timeout_seconds": 900,
   "activation_receipt": "/etc/amber-sync/activation.json",
   "reserve_bytes": 2147483648,
   "build_budget_bytes": 2147483648,

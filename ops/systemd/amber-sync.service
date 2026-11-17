@@ -16,6 +16,7 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 ReadWritePaths=/srv/amber-sync
+ReadWritePaths=/srv/amber-web-requests
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
@@ -32,5 +33,4 @@ Nice=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=amber-sync
-# Node/V8 needs executable memory. User namespaces are needed by bubblewrap.
-# Do not add MemoryDenyWriteExecute or disable Ubuntu's security protections.
+# Node executes only in the independent amber-web-build.service jail.

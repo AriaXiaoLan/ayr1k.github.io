@@ -14,18 +14,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - name: Install Ubuntu official bubblewrap
-        run: sudo apt-get update -qq && sudo apt-get install -y bubblewrap
       - name: Prepare exact verified build tools
         run: python3 ops/bootstrap_tools.py "$RUNNER_TEMP/amber-tools"
+      - name: Provision the independent systemd worker on this disposable runner
+        run: bash ops/tests/provision_ci_worker.sh "$RUNNER_TEMP/amber-tools"
       - name: Verify real isolated install, build, tests and filesystem boundary
-        run: python3 ops/tests/validate_sandbox.py --tools "$RUNNER_TEMP/amber-tools" --scratch "$RUNNER_TEMP/amber-sandbox-validation"
+        run: python3 ops/tests/validate_sandbox.py --scratch "$RUNNER_TEMP/amber-sandbox-validation"
       - name: Show isolated test diagnostics on failure
         if: failure()
         run: |
-          if test -f "$RUNNER_TEMP/amber-sandbox-validation/source/command-failure.log"; then
-            tail -c 8000 "$RUNNER_TEMP/amber-sandbox-validation/source/command-failure.log"
-          fi
+          sudo journalctl -u amber-web-build.service -n 60 --no-pager
+          sudo find /srv/amber-web-build/work -name command-failure.log -type f -exec tail -c 8000 {} \;
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

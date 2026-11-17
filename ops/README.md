@@ -15,7 +15,10 @@
 | 内容 | 路径 / 行为 |
 | --- | --- |
 | 同步程序 / 配置 / 工具 | `/usr/local/lib/amber-sync`、`/etc/amber-sync`、`/opt/amber-web-tools`，root 拥有，运行用户只读 |
-| 独立运行用户 | `amber-sync`，无登录 shell，无 sudo、SSH 或证书私钥权限 |
+| 独立运行用户 | `amber-sync` 同步/发布；`amber-build` 仅构建；均无登录 shell、sudo、SSH 或证书私钥权限 |
+| 构建请求 | `/srv/amber-web-requests`，sync 拥有，build 组只读；2750 继承组，文件 0640 |
+| 构建结果/工作区 | `/srv/amber-web-build`，build 拥有，sync 组只读；2750 / 0640 |
+| 构建根目录 | `/srv/amber-web-build-jail`，root 拥有；只挂载系统运行库、工具、只读请求和可写构建目录 |
 | 私有状态、缓存、锁、暂存、清理计划、隔离区 | `/srv/amber-sync/private`，0700 |
 | 新镜像 | `/srv/amber-sync/public/mirror/{amber,ambere}/{version}` |
 | 静态网站与回滚版本 | `/srv/amber-sync/public/sites/{commit}`，仅复制 `dist/client` |
@@ -52,7 +55,7 @@
 - 任一组件失败不阻止其他组件继续；结构化 JSON 日志和私有 status.json 保留失败代码及各组件上次成功时间。定时任务整体返回非零，不能把部分成功记作整体成功。
 - 每产品最近五个**成功同步**版本在活动镜像中保留。当前/上一版页面的引用额外保护，允许超过五个。调度任务只生成清理计划，不自动执行。审阅后显式 `quarantine PLAN_ID` 会重新验证状态、清单、页面引用和有效期，再原子移入私有可恢复隔离区。计划超过 24 小时、状态变化、未知文件或符号链接均拒绝。
 - 隔离会释放公开路径，**不释放磁盘空间**。`restore` 使用原文件、清单和摘要恢复，支持中断后恢复。程序没有永久删除命令；也不清理 GitHub、旧 `/downloads/`、非管理文件或网站回滚目录。若需要真正回收磁盘，先备份到独立存储并验证可恢复性，再就具体永久删除列表另行取得用户确认。不要运行通配递归删除命令。
-- 失败暂存、构建目录与历史网站也保留以供诊断。它们可能增长；监控容量、定期审阅，确认可从固定 Git 提交/锁文件重建后，将具体列表走单独清理流程。任务宁可报告空间不足，也不冒险删数据。
+- 失败暂存、构建请求/结果/工作目录与历史网站也保留以供诊断。它们可能增长；监控容量、定期审阅，确认可从固定 Git 提交/锁文件重建后，将具体列表走单独清理流程。任务宁可报告空间不足，也不冒险删数据。
 
 ## 部署前：先只读核对并保存原始文件
 
@@ -82,10 +85,11 @@ sha256sum "$backup/server-download-buttons.patch" "$backup/original-html.tar.gz"
 
 ## 安装（独立审查及用户验收后，由管理员操作）
 
-先确认 Python 3.12+、git、ca-certificates 和 Ubuntu 官方 `bubblewrap` 包已安装；缺少时通过 Ubuntu 官方软件源安装。不要关闭 AppArmor、修改 userns 系统安全开关、放宽防火墙/SSH。用户命名空间或 bubblewrap 被现有安全策略拒绝时，**停止网站构建部署**，保留原站点；需要另行设计受限构建账户/构建机，不能降级为在拥有镜像写权限的服务宿主直接执行 pnpm。
+先确认 Python 3.12+、git、ca-certificates 和 systemd 已安装；缺少时通过 Ubuntu 官方软件源安装。不需要 bubblewrap 或允许非特权用户命名空间，也不修改 AppArmor、防火墙或 SSH。真实 Ubuntu 24.04 CI 已发现非特权 UID 映射被拒绝，因此实现使用 root 管理的固定 systemd 单元创建挂载根目录，再以独立非 root 账户运行构建。
 
-本服务使用 `bwrap` 将系统运行库和固定工具只读挂载，仅允许构建临时目录可写；不挂载同步状态、镜像、主目录、SSH 或证书。依赖安装 `--frozen-lockfile --ignore-scripts`，构建及现有测试在同一沙箱内运行。工具固定 Node 24.22.1 / pnpm 11.25.0；以后更改版本必须同步维护工具安装、源码 pin 和测试。
+`amber-sync` 只向固定请求文件写入随机 job ID、固定提交、源码 tar 摘要和页面版本引用。`amber-web-build.path` 监听该文件，启动 root 拥有的固定 `amber-web-build.service`，以 `amber-build` 身份进入 RootDirectory。源码 tar 在运行前验证摘要并安全提取；构建账户看不到同步私有状态、镜像、主目录、SSH 或证书。仅 `/build` 可写，`/requests` 和 `/usr`、`/tools` 只读；服务终止时 systemd 杀死所有子进程。同步账户等待服务完全结束，逐文件核验结果及副本摘要，再发布自己的副本。服务账户没有启动任意 systemd 单元或执行 sudo 的权限。
 
+依赖安装使用 `--frozen-lockfile --ignore-scripts`，构建及现有测试在同一受限根目录内运行。固定 Node 24.22.1 / pnpm 11.25.0；更改版本必须同步工具安装、源码 pin、单元挂载和测试。main 不会在同步服务宿主上执行 pnpm。
 ```sh
 # 在本 PR 的全新、已审核检出目录中；不要使用旧生产工作副本。
 python3 ops/bootstrap_tools.py "$HOME/amber-tools-candidate"
@@ -96,32 +100,46 @@ sudo cp -a "$HOME/amber-tools-candidate/." /opt/amber-web-tools/
 sudo chown -R root:root /opt/amber-web-tools
 sudo chmod -R a+rX,go-w /opt/amber-web-tools
 sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin amber-sync
+sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin amber-build
 sudo install -d -o root -g root -m 755 /usr/local/lib/amber-sync /etc/amber-sync
-sudo install -o root -g root -m 644 ops/amber_sync.py ops/site_builder.py /usr/local/lib/amber-sync/
+sudo install -o root -g root -m 644 ops/amber_sync.py ops/site_builder.py ops/build_worker.py /usr/local/lib/amber-sync/
 sudo install -o root -g root -m 644 ops/config.example.json /etc/amber-sync/config.json
 sudo install -d -o amber-sync -g amber-sync -m 711 /srv/amber-sync
 sudo install -d -o amber-sync -g amber-sync -m 700 /srv/amber-sync/private
 sudo install -d -o amber-sync -g amber-sync -m 755 /srv/amber-sync/public
+sudo install -d -o amber-sync -g amber-build -m 2750 /srv/amber-web-requests
+sudo install -d -o amber-build -g amber-sync -m 2750 /srv/amber-web-build /srv/amber-web-build/results
+sudo install -d -o root -g root -m 755 /srv/amber-web-build-jail
+printf '%s\n' 'AMBER build jail v1' | sudo tee /srv/amber-web-build-jail/.amber-build-jail >/dev/null
+sudo chmod 444 /srv/amber-web-build-jail/.amber-build-jail
+sudo ln -s usr/bin /srv/amber-web-build-jail/bin
+sudo ln -s usr/sbin /srv/amber-web-build-jail/sbin
+sudo ln -s usr/lib /srv/amber-web-build-jail/lib
+sudo ln -s usr/lib64 /srv/amber-web-build-jail/lib64
+sudo install -o root -g root -m 644 ops/systemd/amber-web-build.service ops/systemd/amber-web-build.path /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start amber-web-build.path
 ```
 
-如用户或目录已存在，先核对归属及内容，不能直接覆盖。所有 public/private/staging/quarantine/site-sets 必须在同一文件系统；Nginx 的 www-data 只需 public 的读取和目录穿越权限。服务账户不能修改 root 拥有的程序、配置或工具。需要安装更新版程序时先停止 timer/service，备份旧程序和状态，再只替换审核过的程序文件。
+如用户或目录已存在，先核对归属及内容，不能直接覆盖。所有 public/private/staging/quarantine/site-sets 必须在同一文件系统；Nginx 的 www-data 只需 public 的读取和目录穿越权限。服务账户不能修改 root 拥有的程序、配置或工具。需要安装更新版程序时先停止 timer/service 和 amber-web-build.path/amber-web-build.service，备份旧程序和状态，再只替换审核过的程序文件。
 
-容量预算：按 1.7.4 规模，两产品五版本的受支持包约 **6.4 GiB**，另需保留旧站点/旧包、隔离版本、构建与诊断目录、2 GiB 构建预算和 2 GiB 空间余量。建议首次回填前有至少 15 GiB 可用空间，实际按磁盘和保留量核算；程序每次下载/发布仍检查空间。修改 reserve 不得低于实际系统/日志需要。
+容量预算：按 1.7.4 规模，两产品五版本的受支持包约 **6.4 GiB**，另需保留旧站点/旧包、隔离版本、构建与诊断目录、至少 2 GiB 构建预算和 2 GiB 空间余量；构建服务自身还检查其所在文件系统至少有 4 GiB 可用。建议首次回填前有至少 15 GiB 可用空间，实际按磁盘和保留量核算；程序每次下载/发布仍检查空间。修改 reserve 不得低于实际系统/日志需要。
 
-在隔离测试根目录验证实际 bwrap、固定工具安装、全量冻结依赖安装和以下所有测试，再运行一次候选构建。`config.example.json` 可复制到私有测试配置，`root` 指向 `/srv/amber-sync-staging`，`tools` 使用同一只读工具目录；不要把候选目录加入 Nginx。测试配置的 activation receipt 仍须如实记录已备份并核对的服务器改动。首次任务只能在本 PR 已批准合并后的 main 上运行，否则官网旧 main 缺少 catalog/tool pins 会明确拒绝构建。
+在隔离测试根目录验证实际 systemd 构建账户、固定工具安装、全量冻结依赖安装和以下所有测试，再运行一次候选构建。`config.example.json` 可复制到私有测试配置，`root` 指向 `/srv/amber-sync-staging`，`tools` 使用同一只读工具目录；不要把候选目录加入 Nginx。测试配置的 activation receipt 仍须如实记录已备份并核对的服务器改动。首次任务只能在本 PR 已批准合并后的 main 上运行，否则官网旧 main 缺少 catalog/tool pins 会明确拒绝构建。
 
 ```sh
 python3 -m unittest discover -s ops/tests -v
 /opt/amber-web-tools/node/bin/node --version
 /opt/amber-web-tools/node/bin/node /opt/amber-web-tools/pnpm/bin/pnpm.cjs --version
-# 本机/CI 的常规构建验证，生产服务还须验证 bwrap 内同样的命令：
+# 本机/CI 的常规构建验证，生产服务还须验证独立构建服务内同样的命令：
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
 pnpm test:sites
 pnpm test:mirror
 PYTHONPATH=ops python3 -c 'from pathlib import Path; from site_builder import validate_static; print(validate_static(Path("dist/client")))'
 # 必须实际验证生产使用的沙箱：全新 scratch 目录，不指向原站点或 runtime。
-python3 ops/tests/validate_sandbox.py --tools /opt/amber-web-tools --scratch "$HOME/amber-sandbox-validation"
+# 请求/结果目录按上述权限预置；以无 sudo 的同步身份验证，不以 root 运行。
+sudo -u amber-sync python3 ops/tests/validate_sandbox.py --scratch /srv/amber-sync/private/worker-validation
 ```
 
 完成原补丁整合、备份及 Nginx 配置审阅后，管理员在服务器**本地**创建 `/etc/amber-sync/activation.json`，root:root 0644，填入两个备份文件的实际 SHA-256。不要照抄占位值：
@@ -197,14 +215,14 @@ sudo -u amber-sync /usr/bin/python3 /usr/local/lib/amber-sync/amber_sync.py --co
 
 | 情况 | 检查与恢复 |
 | --- | --- |
-| 任务失败 / 超时 / 限流 | `systemctl status amber-sync.service`、`journalctl -u amber-sync.service --since '2 hours ago'`、私有 status.json 的各组件 ok/code/last_success；先排除网络和配额，再手动 start；失败保留旧站点、下载和指针 |
+| 任务失败 / 超时 / 限流 | `systemctl status amber-sync.service amber-web-build.service amber-web-build.path`、`journalctl -u amber-sync.service -u amber-web-build.service --since '2 hours ago'`、私有 status.json 的各组件 ok/code/last_success；先排除网络和配额，再手动 start；失败保留旧站点、下载和指针 |
 | 磁盘不足 | 停 timer，检查 `df -h`、私有暂存/隔离/历史网站与日志；先扩容或备份，按具体可恢复清单处理；不降低校验、不自动删未知数据 |
 | 缺摘要 / 替换资产 | 固定该项，GitHub 下载仍可用；复核可信 Release，联系发布维护流程补齐/重新发布新版本，不能接受替换旧版本 |
 | 状态文件损坏 | 停 timer/service；备份整个私有状态及公开元数据；从已验证状态备份恢复，逐文件核对；程序不重建或接管陌生目录 |
 | Nginx/HTTPS 不通 | 检查 nginx -t、服务、域名 DNS 和公网可达性；恢复已备份配置；不要关闭 TLS 验证或防火墙 |
 | 证书续期 | 确认 certbot timer 仍启用、ACME 路径未变、reload 后 dry-run 成功；到期前至少 30 天处理失败；不读取或上传私钥 |
 | 服务器/流量到期 | 在腾讯云控制台维护到期提醒、余额/自动续费、流量和快照；建议至少提前 14 天核对，到期前延续服务；本程序不能续费服务器 |
-| 告警 | 默认 journal 和退出码，不擅自给他人发消息。接入现有监控：service failed 立即报警，任一 last_success 超过 90 分钟、磁盘低于余量、HTTPS 外部探测失败及证书剩余 <30 天报警。未接监控前管理员需日常查看，不能假定已有推送通知 |
+| 告警 | 默认两个 service 的 journal 和退出码，不擅自给他人发消息。接入现有监控：service failed 立即报警，任一 last_success 超过 90 分钟、磁盘低于余量、HTTPS 外部探测失败及证书剩余 <30 天报警。未接监控前管理员需日常查看，不能假定已有推送通知 |
 
 备份至少包括 root 拥有的配置/程序、private/state.json（含 observations）、当前/上一版网站及相应镜像元数据。隔离区和未知文件在永久清理前另行离机备份并恢复验证。备份运行期间先停 service/timer 或使用一致性快照，完成后恢复 timer。
 
@@ -214,4 +232,9 @@ Python 测试覆盖：新版本、两产品不同步、数值排序、无更新�
 
 CI 构建真实官网，运行原有 Sites 测试与新增镜像逻辑测试，校验静态引用；固定 Playwright 版本在隔离 Chromium 中验证中英文、两产品、五个安装包入口、桌面/手机、镜像失败与部分可用。静态预览和 ops 源码作为 PR Actions artifact 下载，名称包含被测试 head revision，不提供或执行软件安装包。
 
-CI 不是生产服务器验收。上线前仍必须现场验证 Ubuntu 安全策略下的 bwrap、真实工具下载/安装、冻结依赖、Nginx/HTTPS/ACME、外部下载哈希、磁盘与权限、原补丁核对和生产回滚。未经这些检查不能宣称生产自动更新已启用。
+CI 不是生产服务器验收。上线前仍必须现场验证 Ubuntu 的 systemd 受限根目录与独立 UID、真实工具下载/安装、冻结依赖、Nginx/HTTPS/ACME、外部下载哈希、磁盘与权限、原补丁核对和生产回滚。未经这些检查不能宣称生产自动更新已启用。
+
+
+构建服务需单独维护 `amber-web-build.path`；启动 timer 前确认 path active/waiting。RootDirectory 挂载由 systemd 系统管理器建立，进程本身没有 root/capabilities；不需要为运行用户开放 sudo 或系统单元管理权限。故障时看两个 service 和 path 的 journal，构建错误原始日志位于 build 工作目录下的 command-failure.log，只在服务器私有目录诊断，不公开上传。GitHub CI 的 provision_ci_worker.sh 只允许在一次性 GitHub runner 上执行，不能当成生产安装脚本。
+
+真实沙箱集成测试会验证独立 UID、只读系统/请求目录、同步状态/镜像/证书不可见、清空凭据环境，再实际安装固定依赖并构建。单元创建/启动、命名账户和目录安装均属于管理员的一次性部署步骤；不能仅在宿主运行 pnpm 来代替这项验证。

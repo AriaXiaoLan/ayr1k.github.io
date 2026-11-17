@@ -15,6 +15,7 @@ import urllib.error
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import amber_sync as sync
 import site_builder as site
+import build_worker as worker
 
 
 def fixture(product="AMBER", version="1.7.4"):
@@ -407,6 +408,62 @@ class ValidationTests(unittest.TestCase):
             (root / "index.html").write_text('<script src="/assets/missing.js"></script>')
             with self.assertRaisesRegex(sync.SyncError, "STATIC_REFERENCE_MISSING"):
                 site.validate_static(root)
+
+
+class WorkerProtocolTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.engine = sync.Engine({'root':str(self.root / 'runtime'), 'reserve_bytes':0})
+        self.results = self.root / 'worker-results'
+        self.job_id, self.commit = 'a' * 32, 'b' * 40
+        self.job = self.results / self.job_id
+        (self.job / 'site').mkdir(parents=True)
+        (self.job / 'site/index.html').write_text('<p>fixture</p>')
+        self.pins = {p:['1.7.4'] for p in sync.PRODUCTS}
+        self.result = {'schema':1,'id':self.job_id,'commit':self.commit,'ok':True,
+                       'pins':self.pins,'files':worker.static_hashes(self.job / 'site')}
+        self.write_result()
+
+    def write_result(self):
+        sync.atomic_json(self.job / 'result.json', self.result)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_verified_worker_result_copied_to_sync_storage(self):
+        candidate = worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
+        self.assertTrue(candidate.is_relative_to(self.engine.private))
+        self.assertEqual(worker.static_hashes(candidate),self.result['files'])
+
+    def test_other_commit_or_job_refused(self):
+        for field in ('id','commit'):
+            with self.subTest(field=field):
+                original = self.result[field]
+                self.result[field] = 'c' * len(original)
+                self.write_result()
+                with self.assertRaisesRegex(sync.SyncError,'BUILD_RESULT_IDENTITY_MISMATCH'):
+                    worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
+                self.result[field] = original
+
+    def test_wrong_page_pins_refused(self):
+        self.result['pins'] = {'AMBER':['9.0.0']}
+        self.write_result()
+        with self.assertRaisesRegex(sync.SyncError,'BUILD_RESULT_PINS_MISMATCH'):
+            worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
+
+    def test_tampered_or_extra_output_refused(self):
+        (self.job / 'site/index.html').write_text('changed')
+        with self.assertRaisesRegex(sync.SyncError,'BUILD_RESULT_INTEGRITY'):
+            worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
+
+    def test_failed_worker_is_not_success_and_cannot_inject_log_text(self):
+        for code,expected in [('BUILD_COMMAND_FAILED','BUILD_COMMAND_FAILED'),
+                              ('arbitrary response text','INVALID_BUILD_FAILURE_CODE')]:
+            self.result.update(ok=False,code=code)
+            self.write_result()
+            with self.assertRaisesRegex(sync.SyncError,expected):
+                worker.accept_result(self.engine,self.results,self.job_id,self.commit,self.pins)
             (root / "index.html").write_text('<p>working</p>')
             (root / "private.key").write_text('fixture')
             with self.assertRaisesRegex(sync.SyncError, "NON_STATIC_OR_SECRET_FILE"):

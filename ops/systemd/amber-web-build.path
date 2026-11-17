@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the exact AMBER build request file
+
+[Path]
+PathChanged=/srv/amber-web-requests/request.json
+Unit=amber-web-build.service
+
+[Install]
+WantedBy=multi-user.target

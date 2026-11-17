@@ -237,32 +237,22 @@ def publish_site(engine, source, static, commit):
     log("website_published", commit=commit, previous=current)
 
 
-def sandbox_build(engine, work):
-    require(os.name == "posix", "LINUX_BUILDER_REQUIRED")
-    tools = Path(engine.config["tools"])
-    require(tools.is_absolute() and not tools.is_symlink() and
-            (tools / "node/bin/node").is_file() and (tools / "pnpm/bin/pnpm.cjs").is_file(),
+def isolated_build(work, tools):
+    """Called only inside the root-owned systemd build jail, as amber-build."""
+    require(os.name == "posix" and os.getuid() != 0, "UNPRIVILEGED_LINUX_BUILDER_REQUIRED")
+    marker = Path('/.amber-build-jail')
+    require(marker.is_file() and marker.stat().st_uid == 0 and
+            marker.read_text().strip() == 'AMBER build jail v1', "SYSTEMD_BUILD_JAIL_REQUIRED")
+    require(tools == Path('/tools') and work.is_relative_to(Path('/build')) and
+            (tools / 'node/bin/node').is_file() and (tools / 'pnpm/bin/pnpm.cjs').is_file(),
             "PINNED_TOOLS_MISSING")
-    # Only the disposable build tree is writable. No state, mirrors, SSH, user
-    # home, certificate keys or credentials are visible to repository scripts.
-    prefix = ["bwrap", "--die-with-parent", "--unshare-user", "--unshare-pid",
-              "--unshare-ipc", "--unshare-uts", "--unshare-cgroup", "--cap-drop", "ALL",
-              "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin",
-              "--symlink", "usr/sbin", "/sbin", "--symlink", "usr/lib", "/lib",
-              "--symlink", "usr/lib64", "/lib64", "--proc", "/proc", "--dev", "/dev",
-              "--tmpfs", "/tmp", "--dir", "/etc", "--dir", "/etc/ssl",
-              "--ro-bind", "/etc/ssl/certs", "/etc/ssl/certs",
-              "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
-              "--ro-bind", "/etc/hosts", "/etc/hosts",
-              "--ro-bind", "/etc/nsswitch.conf", "/etc/nsswitch.conf",
-              "--ro-bind", tools.as_posix(), "/tools",
-              "--bind", work.as_posix(), "/work", "--chdir", "/work",
-              "--clearenv", "--setenv", "PATH", "/tools/node/bin:/usr/bin:/bin",
-              "--setenv", "HOME", "/work/.home", "--setenv", "CI", "true"]
-    require(command(prefix + ["node", "--version"], work).decode().strip() == "v" + NODE,
+    env = {"PATH": "/tools/node/bin:/usr/bin:/bin", "HOME": str(work / '.home'),
+           "CI": "true", "LANG": "C.UTF-8"}
+    node = '/tools/node/bin/node'
+    require(command([node, "--version"], work, env).decode().strip() == "v" + NODE,
             "NODE_VERSION_MISMATCH")
-    pnpm = ["node", "/tools/pnpm/bin/pnpm.cjs"]
-    require(command(prefix + pnpm + ["--version"], work).decode().strip() == PNPM,
+    pnpm = [node, "/tools/pnpm/bin/pnpm.cjs"]
+    require(command(pnpm + ["--version"], work, env).decode().strip() == PNPM,
             "PNPM_VERSION_MISMATCH")
     package = json.loads((work / "package.json").read_text())
     require(package.get("packageManager") == "pnpm@" + PNPM and
@@ -270,11 +260,11 @@ def sandbox_build(engine, work):
             "REPOSITORY_TOOL_PIN_MISMATCH")
     require((work / "pnpm-lock.yaml").is_file(), "LOCKFILE_MISSING")
     lock_hash = digest(work / "pnpm-lock.yaml")
-    command(prefix + pnpm + ["install", "--frozen-lockfile", "--ignore-scripts", "--store-dir", "/work/.store"],
-            work, timeout=600)
-    command(prefix + pnpm + ["build"], work, timeout=300)
-    command(prefix + pnpm + ["test:sites"], work, timeout=120)
-    command(prefix + pnpm + ["test:mirror"], work, timeout=120)
+    command(pnpm + ["install", "--frozen-lockfile", "--ignore-scripts", "--store-dir", str(work / '.store')],
+            work, env, timeout=600)
+    command(pnpm + ["build"], work, env, timeout=300)
+    command(pnpm + ["test:sites"], work, env, timeout=120)
+    command(pnpm + ["test:mirror"], work, env, timeout=120)
     require(digest(work / "pnpm-lock.yaml") == lock_hash, "BUILD_CHANGED_LOCKFILE")
 
 
@@ -315,6 +305,7 @@ def sync_website(engine):
     source.mkdir()
     extract_source(archive, source)
     pins = source_pins(source)
-    sandbox_build(engine, source)
+    from build_worker import request_build
+    static = request_build(engine, source, head)
     require(source_pins(source) == pins, "BUILD_CHANGED_DOWNLOAD_CATALOG")
-    publish_site(engine, source, source / "dist/client", head)
+    publish_site(engine, source, static, head)

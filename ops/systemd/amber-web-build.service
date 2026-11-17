@@ -1,0 +1,42 @@
+[Unit]
+Description=AMBER isolated static website builder
+
+[Service]
+Type=oneshot
+User=amber-build
+Group=amber-build
+UMask=0027
+RootDirectory=/srv/amber-web-build-jail
+MountAPIVFS=yes
+BindReadOnlyPaths=/usr /opt/amber-web-tools:/tools /srv/amber-web-requests:/requests
+BindReadOnlyPaths=/etc/ssl/certs /etc/resolv.conf /etc/hosts /etc/nsswitch.conf
+BindPaths=/srv/amber-web-build:/build
+ReadWritePaths=/build
+WorkingDirectory=/build
+ExecStart=/usr/bin/python3 /usr/local/lib/amber-sync/build_worker.py
+Environment=PATH=/tools/node/bin:/usr/bin:/bin
+Environment=HOME=/build/home
+TimeoutStartSec=14min
+TimeoutStopSec=20s
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=2G
+TasksMax=256
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=amber-web-build
